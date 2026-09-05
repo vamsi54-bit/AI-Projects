@@ -5,7 +5,7 @@ import torch
 from torch.utils.data import Dataset
 
 
-class SignDataSet(Dataset):
+class SignDataset(Dataset):
     def __init__(self, csv_file="data/metadata/metadata.csv"):
         self.csv_file = Path(csv_file)
 
