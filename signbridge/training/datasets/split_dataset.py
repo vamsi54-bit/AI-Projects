@@ -1,30 +1,56 @@
-import torch
-from torch.utils.data import random_split
+import pandas as pd
+
+from sklearn.model_selection import train_test_split
+from torch.utils.data import Subset
 
 from training.datasets.sign_dataset import SignDataset
 
-def split_dataset(dataset,train_ratio = 0.75,val_ratio = 0.15):
-    total_size = len(dataset)
 
-    train_size = int(
-        train_ratio * total_size
+def stratified_split(
+    dataset,
+    csv_file="data/metadata/dataset.csv"
+):
+
+    df = pd.read_csv(csv_file)
+
+    indices = list(range(len(df)))
+    labels = df["class_index"].values
+
+    # 70% train, 30% temporary
+    train_indices, temp_indices = train_test_split(
+        indices,
+        test_size=0.30,
+        stratify=labels,
+        random_state=42
     )
 
-    val_size = int(
-        val_ratio * total_size
+    temp_labels = (
+        df.iloc[temp_indices]["class_index"].values
     )
 
-    test_size = (
-        total_size - train_size - val_size
+    # remaining 30%:
+    # 15% validation
+    # 15% test
+    val_indices, test_indices = train_test_split(
+        temp_indices,
+        test_size=0.50,
+        stratify=temp_labels,
+        random_state=42
     )
 
-    generator = torch.Generator().manual_seed(42)
+    train_dataset = Subset(
+        dataset,
+        train_indices
+    )
 
-    train_dataset,test_dataset,val_dataset = (
-        random_split(
-            dataset,
-            [train_size,val_size,test_size], generator = generator
-        )
+    val_dataset = Subset(
+        dataset,
+        val_indices
+    )
+
+    test_dataset = Subset(
+        dataset,
+        test_indices
     )
 
     return (
@@ -32,33 +58,3 @@ def split_dataset(dataset,train_ratio = 0.75,val_ratio = 0.15):
         val_dataset,
         test_dataset
     )
-
-if __name__ == "__main__":
-
-    dataset = SignDataset()
-
-    train_dataset, val_dataset, test_dataset = (
-        split_dataset(dataset)
-    )
-
-    print(
-        "Total:",
-        len(dataset)
-    )
-
-    print(
-        "Train:",
-        len(train_dataset)
-    )
-
-    print(
-        "Validation:",
-        len(val_dataset)
-    )
-
-    print(
-        "Test:",
-        len(test_dataset)
-    )
-
-    
