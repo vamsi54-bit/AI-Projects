@@ -1,7 +1,7 @@
 from torch.utils.data import DataLoader
 
 from training.datasets.sign_dataset import SignDataset
-from training.datasets.split_dataset import stratified_split
+from training.datasets.split_dataset import grouped_stratified_split
 
 
 BATCH_SIZE = 32
@@ -14,7 +14,7 @@ def create_dataloaders(
     dataset = SignDataset()
 
     train_dataset, val_dataset, test_dataset = (
-        stratified_split(dataset)
+        grouped_stratified_split(dataset)
     )
 
     train_loader = DataLoader(

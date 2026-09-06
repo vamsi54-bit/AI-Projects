@@ -1,60 +1,101 @@
-import pandas as pd
+import re
+import random
 
-from sklearn.model_selection import train_test_split
 from torch.utils.data import Subset
-
 from training.datasets.sign_dataset import SignDataset
 
 
-def stratified_split(
-    dataset,
-    csv_file="data/metadata/dataset.csv"
-):
+def get_group_name(path, label):
 
-    df = pd.read_csv(csv_file)
+    name = path.replace("\\", "/").split("/")[-1]
 
-    indices = list(range(len(df)))
-    labels = df["class_index"].values
-
-    # 70% train, 30% temporary
-    train_indices, temp_indices = train_test_split(
-        indices,
-        test_size=0.30,
-        stratify=labels,
-        random_state=42
+    name = re.sub(
+        r"_(left_tilt|right_tilt)(?=\.npy$)",
+        "",
+        name
     )
 
-    temp_labels = (
-        df.iloc[temp_indices]["class_index"].values
-    )
+    return f"{label}_{name}"
 
-    # remaining 30%:
-    # 15% validation
-    # 15% test
-    val_indices, test_indices = train_test_split(
-        temp_indices,
-        test_size=0.50,
-        stratify=temp_labels,
-        random_state=42
-    )
 
-    train_dataset = Subset(
-        dataset,
-        train_indices
-    )
+def grouped_stratified_split(dataset):
 
-    val_dataset = Subset(
-        dataset,
-        val_indices
-    )
+    random.seed(42)
 
-    test_dataset = Subset(
-        dataset,
-        test_indices
-    )
+    class_groups = {}
+
+    # group samples class-wise
+    for index, sample in enumerate(dataset.samples):
+
+        label = sample["label"]
+
+        group = get_group_name(
+            sample["sequence_file"],
+            label
+        )
+
+        class_groups.setdefault(
+            label, {}
+        )
+
+        class_groups[label].setdefault(
+            group, []
+        ).append(index)
+
+
+    train_idx = []
+    val_idx = []
+    test_idx = []
+
+
+    # split every class separately
+    for label, groups_dict in class_groups.items():
+
+        groups = list(groups_dict.keys())
+
+        random.shuffle(groups)
+
+        total = len(groups)
+
+        train_end = int(total * 0.70)
+        val_end = int(total * 0.85)
+
+        train_groups = groups[:train_end]
+        val_groups = groups[train_end:val_end]
+        test_groups = groups[val_end:]
+
+
+        for group in train_groups:
+            train_idx.extend(
+                groups_dict[group]
+            )
+
+        for group in val_groups:
+            val_idx.extend(
+                groups_dict[group]
+            )
+
+        for group in test_groups:
+            test_idx.extend(
+                groups_dict[group]
+            )
+
 
     return (
-        train_dataset,
-        val_dataset,
-        test_dataset
+        Subset(dataset, train_idx),
+        Subset(dataset, val_idx),
+        Subset(dataset, test_idx)
     )
+
+
+if __name__ == "__main__":
+
+    dataset = SignDataset()
+
+    train, val, test = (
+        grouped_stratified_split(dataset)
+    )
+
+    print("Train:", len(train))
+    print("Val:", len(val))
+    print("Test:", len(test))
