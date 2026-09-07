@@ -1,0 +1,10 @@
+.venv/
+__pycache__/
+*.pyc
+.env
+
+ml/data/raw/
+ml/models/checkpoints/
+
+web/node_modules/
+web/.next/

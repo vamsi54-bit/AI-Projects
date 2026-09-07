@@ -1,0 +1,16 @@
+data:
+  image_size: 224
+  batch_size: 32
+  num_workers: 0
+
+model:
+  name: mobilenet_v3_small
+  number_of_classes: 7
+  pretrained: true
+
+training:
+  epochs: 10
+  learning_rate: 0.0003
+  weight_decay: 0.0001
+  validation_size: 0.15
+  random_seed: 42

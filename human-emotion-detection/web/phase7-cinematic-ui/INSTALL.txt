@@ -1,0 +1,17 @@
+PHASE 7 CINEMATIC UI
+
+1. Extract this ZIP inside your existing web folder.
+2. Choose "Replace the files in the destination" when Windows asks.
+3. Keep your existing public/models, public/ort and public/mediapipe folders.
+4. From the web folder run: npm run dev
+5. Open: http://localhost:3000/detect
+
+Production build verification: PASSED
+
+The detector still expects these existing browser assets:
+- public/models/emotion_model.onnx
+- public/models/face_detector.tflite
+- public/models/labels.json
+- public/models/calibration.json
+- public/ort/*
+- public/mediapipe/*

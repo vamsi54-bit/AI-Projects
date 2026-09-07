@@ -1,0 +1,21 @@
+data:
+  image_size: 260
+  batch_size: 32
+  validation_size: 0.15
+  num_workers: 2
+  random_seed: 42
+
+model:
+  name: efficientnet_b2
+  number_of_classes: 7
+  pretrained: true
+
+training:
+  warmup_epochs: 5
+  finetune_epochs: 30
+  warmup_learning_rate: 0.0003
+  backbone_learning_rate: 0.00001
+  classifier_learning_rate: 0.00005
+  weight_decay: 0.0001
+  label_smoothing: 0.05
+  early_stopping_patience: 7

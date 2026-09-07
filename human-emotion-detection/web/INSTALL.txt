@@ -1,0 +1,43 @@
+PHASE 8 COMPLETE — FULL-STACK + VERCEL
+
+INSTALL IN VS CODE
+1. Extract this ZIP inside your existing web folder.
+2. Choose "Replace the files in the destination".
+3. Keep your existing public/models, public/ort and public/mediapipe folders.
+4. Open PowerShell in the web folder and run:
+
+   npm install
+   npm run build
+   npm run dev
+
+5. Open: http://localhost:3000/detect
+
+TEST THE COMPLETE FLOW
+1. Start live detection and wait a few seconds.
+2. Stop the session.
+3. Open Dashboard and History.
+4. Test Export, Delete and Clear all.
+
+DEPLOY TO VERCEL
+Run from the web folder:
+
+   npm install -g vercel
+   vercel login
+   vercel
+
+Test the preview URL, then deploy production:
+
+   vercel --prod
+
+When importing the GitHub repository, set Vercel Root Directory to:
+   human-emotion-detection/web
+
+No environment variables or Python server are required.
+
+PRIVACY
+- The ONNX model and face detector run inside the browser.
+- Camera frames are never uploaded or stored.
+- Only session statistics use versioned browser storage.
+- History is device-specific and can be exported as JSON.
+
+Production Next.js build: PASSED
