@@ -15,10 +15,14 @@ export interface EmotionPrediction {
 
 export type ModelProfile = "mobile" | "desktop";
 
+type OrtRuntime = typeof import("onnxruntime-web");
+
 interface LoadedModel {
   session: InferenceSession;
+  runtime: OrtRuntime;
   profile: ModelProfile;
   imageSize: number;
+  backend: "webgpu" | "wasm";
 }
 
 const MODEL_SETTINGS = {
@@ -89,26 +93,94 @@ export function getDeviceModelProfile(): ModelProfile {
   return "desktop";
 }
 
+async function createOptimizedSession(
+  profile: ModelProfile,
+  modelPath: string,
+): Promise<{
+  session: InferenceSession;
+  runtime: OrtRuntime;
+  backend: "webgpu" | "wasm";
+}> {
+  const supportsWebGpu =
+    profile === "mobile" &&
+    "gpu" in navigator;
+
+  if (supportsWebGpu) {
+    try {
+      const webGpuRuntime = (
+        await import("onnxruntime-web/webgpu")
+      ) as unknown as OrtRuntime;
+
+      webGpuRuntime.env.wasm.wasmPaths = "/ort/";
+      webGpuRuntime.env.wasm.numThreads = 1;
+
+      const session =
+        await webGpuRuntime.InferenceSession.create(
+          modelPath,
+          {
+            executionProviders: [
+              "webgpu",
+              "wasm",
+            ],
+            graphOptimizationLevel: "all",
+            executionMode: "sequential",
+          },
+        );
+
+      return {
+        session,
+        runtime: webGpuRuntime,
+        backend: "webgpu",
+      };
+    } catch (error) {
+      console.warn(
+        "WebGPU unavailable. Using WASM.",
+        error,
+      );
+    }
+  }
+
+  const wasmRuntime =
+    await import("onnxruntime-web");
+
+  wasmRuntime.env.wasm.wasmPaths = "/ort/";
+  wasmRuntime.env.wasm.numThreads = 1;
+
+  const session =
+    await wasmRuntime.InferenceSession.create(
+      modelPath,
+      {
+        executionProviders: ["wasm"],
+        graphOptimizationLevel: "all",
+        executionMode: "sequential",
+      },
+    );
+
+  return {
+    session,
+    runtime: wasmRuntime,
+    backend: "wasm",
+  };
+}
+
 async function loadModel(): Promise<LoadedModel> {
   if (!modelPromise) {
     modelPromise = (async () => {
-      const ort = await import("onnxruntime-web");
       const profile = getDeviceModelProfile();
       const settings = MODEL_SETTINGS[profile];
 
-      ort.env.wasm.wasmPaths = "/ort/";
-      ort.env.wasm.numThreads = 1;
-
-      const [session, labelsResponse, calibrationResponse] =
-        await Promise.all([
-          ort.InferenceSession.create(settings.path, {
-            executionProviders: ["wasm"],
-            graphOptimizationLevel: "all",
-            executionMode: "sequential",
-          }),
-          fetch("/models/labels.json"),
-          fetch("/models/calibration.json"),
-        ]);
+      const [
+        sessionResult,
+        labelsResponse,
+        calibrationResponse,
+      ] = await Promise.all([
+        createOptimizedSession(
+          profile,
+          settings.path,
+        ),
+        fetch("/models/labels.json"),
+        fetch("/models/calibration.json"),
+      ]);
 
       if (labelsResponse.ok) {
         labels = await labelsResponse.json();
@@ -123,11 +195,15 @@ async function loadModel(): Promise<LoadedModel> {
       }
 
       console.info(
-        `Emotion model: ${profile} (${settings.imageSize}x${settings.imageSize})`,
+        `Emotion model: ${profile}, ` +
+        `${settings.imageSize}px, ` +
+        `backend: ${sessionResult.backend}`,
       );
 
       return {
-        session,
+        session: sessionResult.session,
+        runtime: sessionResult.runtime,
+        backend: sessionResult.backend,
         profile,
         imageSize: settings.imageSize,
       };
@@ -274,7 +350,6 @@ export async function predictEmotion(
   video: HTMLVideoElement,
   box: FaceBox,
 ): Promise<EmotionPrediction> {
-  const ort = await import("onnxruntime-web");
   const loadedModel = await loadModel();
 
   const inputData = preprocessFace(
@@ -283,7 +358,9 @@ export async function predictEmotion(
     loadedModel.imageSize,
   );
 
-  const inputTensor = new ort.Tensor(
+  const Tensor = loadedModel.runtime.Tensor;
+
+  const inputTensor = new Tensor(
     "float32",
     inputData,
     [
