@@ -35,10 +35,8 @@ async function loadSession(): Promise<InferenceSession> {
       const ort = await import("onnxruntime-web");
 
       ort.env.wasm.wasmPaths = "/ort/";
-      const availableThreads = navigator.hardwareConcurrency || 1;
-      ort.env.wasm.numThreads = crossOriginIsolated
-        ? Math.min(2, Math.max(1, availableThreads - 1))
-        : 1;
+      // Single-threaded WASM starts faster and works reliably on mobile and desktop.
+      ort.env.wasm.numThreads = 1;
 
       const [session, labelsResponse, calibrationResponse] =
         await Promise.all([
