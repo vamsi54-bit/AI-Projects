@@ -412,3 +412,111 @@ export async function predictEmotion(
     ),
   };
 }
+export async function predictEmotionFromImage(
+  image: HTMLImageElement,
+  imageWidth: number,
+  imageHeight: number,
+  box: FaceBox,
+): Promise<EmotionPrediction> {
+  const loadedModel = await loadModel();
+  const imageSize = loadedModel.imageSize;
+
+  const canvas = document.createElement("canvas");
+  canvas.width = imageSize;
+  canvas.height = imageSize;
+
+  const context = canvas.getContext("2d", {
+    willReadFrequently: true,
+    alpha: false,
+  });
+
+  if (!context) {
+    throw new Error("Canvas is unavailable.");
+  }
+
+  const padding = Math.max(box.width, box.height) * 0.15;
+  const x = Math.max(0, box.x - padding);
+  const y = Math.max(0, box.y - padding);
+  const width = Math.min(
+    imageWidth - x,
+    box.width + padding * 2,
+  );
+  const height = Math.min(
+    imageHeight - y,
+    box.height + padding * 2,
+  );
+
+  context.drawImage(
+    image,
+    x,
+    y,
+    width,
+    height,
+    0,
+    0,
+    imageSize,
+    imageSize,
+  );
+
+  const pixels = context.getImageData(
+    0,
+    0,
+    imageSize,
+    imageSize,
+  ).data;
+
+  const pixelCount = imageSize * imageSize;
+  const inputData = new Float32Array(3 * pixelCount);
+
+  for (let index = 0; index < pixelCount; index++) {
+    const offset = index * 4;
+
+    const gray =
+      (
+        0.299 * pixels[offset] +
+        0.587 * pixels[offset + 1] +
+        0.114 * pixels[offset + 2]
+      ) / 255;
+
+    inputData[index] = (gray - 0.485) / 0.229;
+    inputData[pixelCount + index] = (gray - 0.456) / 0.224;
+    inputData[pixelCount * 2 + index] =
+      (gray - 0.406) / 0.225;
+  }
+
+  const inputTensor = new loadedModel.runtime.Tensor(
+    "float32",
+    inputData,
+    [1, 3, imageSize, imageSize],
+  );
+
+  const outputs = await loadedModel.session.run({
+    [loadedModel.session.inputNames[0]]: inputTensor,
+  });
+
+  const output =
+    outputs[loadedModel.session.outputNames[0]];
+
+  const probabilities = softmax(
+    Array.from(output.data as Float32Array),
+  );
+
+  let bestIndex = 0;
+
+  for (let index = 1; index < probabilities.length; index++) {
+    if (probabilities[index] > probabilities[bestIndex]) {
+      bestIndex = index;
+    }
+  }
+
+  return {
+    emotion: labels[bestIndex],
+    confidence: probabilities[bestIndex],
+    probabilities: Object.fromEntries(
+      labels.map((label, index) => [
+        label,
+        probabilities[index],
+      ]),
+    ),
+  };
+}
