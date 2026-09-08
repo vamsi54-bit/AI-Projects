@@ -53,7 +53,6 @@ function formatDuration(seconds: number) {
 
 export function WebcamDetector() {
   const videoRef = useRef<HTMLVideoElement>(null);
-  const overlayRef = useRef<HTMLCanvasElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const detectorRef = useRef<FaceDetector | null>(null);
   const animationRef = useRef<number | null>(null);
@@ -91,51 +90,6 @@ export function WebcamDetector() {
     });
   }
 
-  function clearFaceOverlay() {
-    const canvas = overlayRef.current;
-    const context = canvas?.getContext("2d");
-    if (canvas && context) context.clearRect(0, 0, canvas.width, canvas.height);
-  }
-
-  function drawFaceOverlay(liveResults: LiveResult[]) {
-    const video = videoRef.current;
-    const canvas = overlayRef.current;
-    if (!video || !canvas || !video.videoWidth || !video.videoHeight) return;
-
-    if (canvas.width !== video.videoWidth || canvas.height !== video.videoHeight) {
-      canvas.width = video.videoWidth;
-      canvas.height = video.videoHeight;
-    }
-
-    const context = canvas.getContext("2d");
-    if (!context) return;
-    context.clearRect(0, 0, canvas.width, canvas.height);
-
-    for (const { box, prediction } of liveResults) {
-      const color = emotionColors[prediction.emotion] ?? "#67e8f9";
-      const padding = Math.max(4, Math.min(box.width, box.height) * 0.035);
-      const x = Math.max(0, box.x - padding);
-      const y = Math.max(0, box.y - padding);
-      const width = Math.min(canvas.width - x, box.width + padding * 2);
-      const height = Math.min(canvas.height - y, box.height + padding * 2);
-      const corner = Math.max(16, Math.min(width, height) * 0.22);
-
-      context.save();
-      context.strokeStyle = color;
-      context.lineWidth = Math.max(2, canvas.width / 320);
-      context.lineCap = "round";
-      context.shadowColor = color;
-      context.shadowBlur = 8;
-      context.beginPath();
-      context.moveTo(x, y + corner); context.lineTo(x, y); context.lineTo(x + corner, y);
-      context.moveTo(x + width - corner, y); context.lineTo(x + width, y); context.lineTo(x + width, y + corner);
-      context.moveTo(x + width, y + height - corner); context.lineTo(x + width, y + height); context.lineTo(x + width - corner, y + height);
-      context.moveTo(x + corner, y + height); context.lineTo(x, y + height); context.lineTo(x, y + height - corner);
-      context.stroke();
-      context.restore();
-    }
-  }
-
   async function analyseFrame(timestamp: number) {
     const video = videoRef.current;
     const detector = detectorRef.current;
@@ -157,7 +111,6 @@ export function WebcamDetector() {
 
     if (boxes.length === 0) {
       setResults([]);
-      clearFaceOverlay();
       setLatency(Math.round(performance.now() - startedAt));
       return;
     }
@@ -189,7 +142,6 @@ export function WebcamDetector() {
     }
 
     setResults(predictions);
-    drawFaceOverlay(predictions);
     setLatency(Math.round(performance.now() - startedAt));
   }
 
@@ -294,7 +246,6 @@ export function WebcamDetector() {
     if (videoRef.current) videoRef.current.srcObject = null;
     setVideoReady(false);
     setResults([]);
-    clearFaceOverlay();
     setTimeline([]);
     setStatus("idle");
   }
@@ -331,7 +282,6 @@ export function WebcamDetector() {
           data-active={status === "live" || status === "loading"}
           className="camera-feed"
         />
-        <canvas ref={overlayRef} className="face-overlay-canvas" aria-hidden="true" />
       </div>
 
       <div className="cinema-grid" />
