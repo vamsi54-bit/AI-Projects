@@ -53,6 +53,7 @@ function formatDuration(seconds: number) {
 
 export function WebcamDetector() {
   const videoRef = useRef<HTMLVideoElement>(null);
+  const overlayRef = useRef<HTMLCanvasElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const detectorRef = useRef<FaceDetector | null>(null);
   const animationRef = useRef<number | null>(null);
@@ -90,6 +91,51 @@ export function WebcamDetector() {
     });
   }
 
+  function clearFaceOverlay() {
+    const canvas = overlayRef.current;
+    const context = canvas?.getContext("2d");
+    if (canvas && context) context.clearRect(0, 0, canvas.width, canvas.height);
+  }
+
+  function drawFaceOverlay(liveResults: LiveResult[]) {
+    const video = videoRef.current;
+    const canvas = overlayRef.current;
+    if (!video || !canvas || !video.videoWidth || !video.videoHeight) return;
+
+    if (canvas.width !== video.videoWidth || canvas.height !== video.videoHeight) {
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+    }
+
+    const context = canvas.getContext("2d");
+    if (!context) return;
+    context.clearRect(0, 0, canvas.width, canvas.height);
+
+    for (const { box, prediction } of liveResults) {
+      const color = emotionColors[prediction.emotion] ?? "#67e8f9";
+      const padding = Math.max(4, Math.min(box.width, box.height) * 0.035);
+      const x = Math.max(0, box.x - padding);
+      const y = Math.max(0, box.y - padding);
+      const width = Math.min(canvas.width - x, box.width + padding * 2);
+      const height = Math.min(canvas.height - y, box.height + padding * 2);
+      const corner = Math.max(16, Math.min(width, height) * 0.22);
+
+      context.save();
+      context.strokeStyle = color;
+      context.lineWidth = Math.max(2, canvas.width / 320);
+      context.lineCap = "round";
+      context.shadowColor = color;
+      context.shadowBlur = 8;
+      context.beginPath();
+      context.moveTo(x, y + corner); context.lineTo(x, y); context.lineTo(x + corner, y);
+      context.moveTo(x + width - corner, y); context.lineTo(x + width, y); context.lineTo(x + width, y + corner);
+      context.moveTo(x + width, y + height - corner); context.lineTo(x + width, y + height); context.lineTo(x + width - corner, y + height);
+      context.moveTo(x + corner, y + height); context.lineTo(x, y + height); context.lineTo(x, y + height - corner);
+      context.stroke();
+      context.restore();
+    }
+  }
+
   async function analyseFrame(timestamp: number) {
     const video = videoRef.current;
     const detector = detectorRef.current;
@@ -111,6 +157,7 @@ export function WebcamDetector() {
 
     if (boxes.length === 0) {
       setResults([]);
+      clearFaceOverlay();
       setLatency(Math.round(performance.now() - startedAt));
       return;
     }
@@ -142,6 +189,7 @@ export function WebcamDetector() {
     }
 
     setResults(predictions);
+    drawFaceOverlay(predictions);
     setLatency(Math.round(performance.now() - startedAt));
   }
 
@@ -246,6 +294,7 @@ export function WebcamDetector() {
     if (videoRef.current) videoRef.current.srcObject = null;
     setVideoReady(false);
     setResults([]);
+    clearFaceOverlay();
     setTimeline([]);
     setStatus("idle");
   }
@@ -263,61 +312,6 @@ export function WebcamDetector() {
       if (animationRef.current !== null) cancelAnimationFrame(animationRef.current);
     };
   }, []);
-
-  function getOverlayStyle(box: FaceBox): CSSProperties {
-    const video = videoRef.current;
-
-    if (!video || !video.videoWidth || !video.videoHeight) {
-      return { opacity: 0 };
-    }
-
-    const app = video.closest(".cinema-app") as HTMLElement | null;
-
-    const videoRect = video.getBoundingClientRect();
-
-    const appRect = app?.getBoundingClientRect() ?? {
-      left: 0,
-      top: 0,
-    };
-
-    /*
-     * Scale used by object-fit: cover.
-     */
-    const contentScale = Math.max(
-      video.clientWidth / video.videoWidth,
-      video.clientHeight / video.videoHeight,
-    );
-
-    const renderedWidth = video.videoWidth * contentScale;
-    const renderedHeight = video.videoHeight * contentScale;
-
-    const cropX = (video.clientWidth - renderedWidth) / 2;
-    const cropY = (video.clientHeight - renderedHeight) / 2;
-
-    const boxWidth = box.width * contentScale;
-    const boxHeight = box.height * contentScale;
-
-    const unmirroredLeft = cropX + box.x * contentScale;
-    const unmirroredTop = cropY + box.y * contentScale;
-
-    /*
-     * Account for CSS scale(1.012).
-     */
-    const cssScaleX = videoRect.width / video.clientWidth;
-    const cssScaleY = videoRect.height / video.clientHeight;
-
-    /*
-     * Camera feed uses scaleX(-1), so mirror X.
-     */
-    const mirroredLeft = video.clientWidth - unmirroredLeft - boxWidth;
-
-    return {
-      left: videoRect.left - appRect.left + mirroredLeft * cssScaleX,
-      top: videoRect.top - appRect.top + unmirroredTop * cssScaleY,
-      width: boxWidth * cssScaleX,
-      height: boxHeight * cssScaleY,
-    };
-  }
 
   const primaryResult = results[0]?.prediction;
   const primaryColor = primaryResult
@@ -337,6 +331,7 @@ export function WebcamDetector() {
           data-active={status === "live" || status === "loading"}
           className="camera-feed"
         />
+        <canvas ref={overlayRef} className="face-overlay-canvas" aria-hidden="true" />
       </div>
 
       <div className="cinema-grid" />
@@ -400,28 +395,6 @@ export function WebcamDetector() {
       )}
 
       {status === "live" && <div className="scan-beam" />}
-
-      {results.map(({ box, prediction }, index) => {
-        const color = emotionColors[prediction.emotion] ?? "#67e8f9";
-        return (
-          <div
-            key={`${index}-${prediction.emotion}`}
-            className="face-hud"
-            style={{ ...getOverlayStyle(box), "--hud-color": color } as CSSProperties}
-          >
-            <i className="hud-corner" /><i className="hud-corner" />
-            <i className="hud-corner" /><i className="hud-corner" />
-            <div className="hud-target" />
-            <div className="hud-label">
-              <span className="live-dot" style={{ background: color }} />
-              <span className="text-xs font-semibold capitalize text-white">{prediction.emotion}</span>
-              <span className="font-mono text-[11px] text-slate-400">
-                {(prediction.confidence * 100).toFixed(0)}%
-              </span>
-            </div>
-          </div>
-        );
-      })}
 
       {status === "live" && results.length === 0 && (
         <div className="glass-panel absolute left-1/2 top-1/2 z-10 -translate-x-1/2 -translate-y-1/2 rounded-full px-5 py-3 text-sm text-slate-300">
