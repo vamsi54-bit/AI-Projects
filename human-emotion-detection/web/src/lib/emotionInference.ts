@@ -26,6 +26,8 @@ let labels = [
   "surprise",
 ];
 let temperature = 1;
+let preprocessingCanvas: HTMLCanvasElement | null = null;
+let preprocessingContext: CanvasRenderingContext2D | null = null;
 
 async function loadSession(): Promise<InferenceSession> {
   if (!sessionPromise) {
@@ -33,7 +35,10 @@ async function loadSession(): Promise<InferenceSession> {
       const ort = await import("onnxruntime-web");
 
       ort.env.wasm.wasmPaths = "/ort/";
-      ort.env.wasm.numThreads = 1;
+      const availableThreads = navigator.hardwareConcurrency || 1;
+      ort.env.wasm.numThreads = crossOriginIsolated
+        ? Math.min(2, Math.max(1, availableThreads - 1))
+        : 1;
 
       const [session, labelsResponse, calibrationResponse] =
         await Promise.all([
@@ -65,13 +70,17 @@ function preprocessFace(
   video: HTMLVideoElement,
   box: FaceBox,
 ): Float32Array {
-  const canvas = document.createElement("canvas");
-  canvas.width = IMAGE_SIZE;
-  canvas.height = IMAGE_SIZE;
+  if (!preprocessingCanvas) {
+    preprocessingCanvas = document.createElement("canvas");
+    preprocessingCanvas.width = IMAGE_SIZE;
+    preprocessingCanvas.height = IMAGE_SIZE;
+    preprocessingContext = preprocessingCanvas.getContext("2d", {
+      willReadFrequently: true,
+      alpha: false,
+    });
+  }
 
-  const context = canvas.getContext("2d", {
-    willReadFrequently: true,
-  });
+  const context = preprocessingContext;
 
   if (!context) {
     throw new Error("Canvas is unavailable.");

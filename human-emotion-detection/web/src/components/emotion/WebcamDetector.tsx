@@ -65,6 +65,7 @@ export function WebcamDetector() {
     confidenceTotal: 0,
     emotions: {} as Record<string, number>,
   });
+  const performanceProfileRef = useRef({ interval: 300, maxFaces: 3 });
 
   const [status, setStatus] = useState<"idle" | "loading" | "live" | "error">("idle");
   const [error, setError] = useState("");
@@ -98,7 +99,7 @@ export function WebcamDetector() {
     const boxes: FaceBox[] = detectionResult.detections
       .map((detection) => detection.boundingBox)
       .filter((box) => Boolean(box))
-      .slice(0, 3)
+      .slice(0, performanceProfileRef.current.maxFaces)
       .map((box) => ({
         x: box!.originX,
         y: box!.originY,
@@ -145,7 +146,7 @@ export function WebcamDetector() {
   function beginLoop() {
     const loop = (timestamp: number) => {
       animationRef.current = requestAnimationFrame(loop);
-      if (timestamp - lastRunRef.current < 300 || busyRef.current) return;
+      if (timestamp - lastRunRef.current < performanceProfileRef.current.interval || busyRef.current) return;
 
       lastRunRef.current = timestamp;
       busyRef.current = true;
@@ -168,8 +169,21 @@ export function WebcamDetector() {
       smootherRef.current.reset();
       sessionStatsRef.current = { samples: 0, confidenceTotal: 0, emotions: {} };
 
+      const mobileDevice = window.matchMedia("(pointer: coarse)").matches ||
+        (navigator.hardwareConcurrency || 8) <= 4;
+      performanceProfileRef.current = mobileDevice
+        ? { interval: 520, maxFaces: 1 }
+        : { interval: 300, maxFaces: 3 };
+
       const stream = await navigator.mediaDevices.getUserMedia({
-        video: { width: { ideal: 1280 }, height: { ideal: 720 }, facingMode: "user" },
+        video: mobileDevice
+          ? {
+              width: { ideal: 640, max: 960 },
+              height: { ideal: 480, max: 720 },
+              frameRate: { ideal: 24, max: 30 },
+              facingMode: "user",
+            }
+          : { width: { ideal: 1280 }, height: { ideal: 720 }, facingMode: "user" },
         audio: false,
       });
       streamRef.current = stream;
