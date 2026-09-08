@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Activity, Camera, Clock3, Download, ScanFace, Trash2 } from "lucide-react";
+import { Activity, Camera, Clock3, Download, ImagePlus, ScanFace, Trash2 } from "lucide-react";
 import { useEffect, useState, type CSSProperties } from "react";
 
 import {
@@ -86,6 +86,7 @@ export default function SessionAnalytics({ view }: { view: "dashboard" | "histor
         </Link>
         <nav aria-label="Primary navigation">
           <Link href="/detect">Detect</Link>
+          <Link href="/upload">Upload</Link>
           <Link href="/dashboard" data-active={view === "dashboard"}>Dashboard</Link>
           <Link href="/history" data-active={view === "history"}>History</Link>
         </nav>
@@ -94,7 +95,10 @@ export default function SessionAnalytics({ view }: { view: "dashboard" | "histor
       <section className="data-content">
         <div className="data-title-row">
           <div><p className="data-kicker">Private analytics</p><h1>{view === "dashboard" ? "Session overview" : "Detection history"}</h1><p>Only expression statistics are saved in this browser. Camera frames are never stored.</p></div>
-          <Link href="/detect" className="data-primary"><Camera /> Start detection</Link>
+          <div className="dashboard-actions">
+            <Link href="/detect" className="data-primary"><Camera /> Live detection</Link>
+            <Link href="/upload" className="data-primary data-secondary"><ImagePlus /> Upload image</Link>
+          </div>
         </div>
 
         <div className="metric-grid">
