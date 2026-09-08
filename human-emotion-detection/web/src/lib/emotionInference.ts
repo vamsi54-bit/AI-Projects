@@ -27,8 +27,8 @@ interface LoadedModel {
 
 const MODEL_SETTINGS = {
   mobile: {
-    path: "/models/emotion_model_mobile.onnx",
-    imageSize: 160,
+    path: "/models/emotion_model_desktop.onnx",
+    imageSize: 260,
   },
   desktop: {
     path: "/models/emotion_model_desktop.onnx",
@@ -101,9 +101,7 @@ async function createOptimizedSession(
   runtime: OrtRuntime;
   backend: "webgpu" | "wasm";
 }> {
-  const supportsWebGpu =
-    profile === "mobile" &&
-    "gpu" in navigator;
+  const supportsWebGpu = "gpu" in navigator;
 
   if (supportsWebGpu) {
     try {

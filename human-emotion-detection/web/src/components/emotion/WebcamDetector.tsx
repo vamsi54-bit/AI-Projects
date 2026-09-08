@@ -251,6 +251,16 @@ export function WebcamDetector() {
   }
 
   useEffect(() => {
+    const preloadTimer = window.setTimeout(() => {
+      void prepareEmotionModel().catch((preloadError) => {
+        console.warn("Emotion model preload failed.", preloadError);
+      });
+    }, 150);
+
+    return () => window.clearTimeout(preloadTimer);
+  }, []);
+
+  useEffect(() => {
     if (status !== "live") return;
     const timer = window.setInterval(() => setElapsedSeconds((value) => value + 1), 1000);
     return () => window.clearInterval(timer);
