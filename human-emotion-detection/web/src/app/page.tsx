@@ -1,5 +1,5 @@
-import { redirect } from "next/navigation";
+import LandingExperience from "@/components/landing/LandingExperience";
 
 export default function HomePage() {
-  redirect("/detect");
+  return <LandingExperience />;
 }

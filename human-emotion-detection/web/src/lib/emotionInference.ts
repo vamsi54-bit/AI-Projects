@@ -412,8 +412,8 @@ export async function predictEmotion(
     ),
   };
 }
-export async function predictEmotionFromImage(
-  image: HTMLImageElement,
+async function predictEmotionFromSource(
+  image: CanvasImageSource,
   imageWidth: number,
   imageHeight: number,
   box: FaceBox,
@@ -518,5 +518,96 @@ export async function predictEmotionFromImage(
         probabilities[index],
       ]),
     ),
+  };
+}
+
+export async function predictEmotionFromImage(
+  image: HTMLImageElement,
+  imageWidth: number,
+  imageHeight: number,
+  box: FaceBox,
+): Promise<EmotionPrediction> {
+  return predictEmotionFromSource(
+    image,
+    imageWidth,
+    imageHeight,
+    box,
+  );
+}
+
+export interface HeatmapCell {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  intensity: number;
+}
+
+export interface EmotionHeatmap {
+  emotion: string;
+  cells: HeatmapCell[];
+}
+
+export async function generateEmotionHeatmap(
+  image: HTMLImageElement,
+  imageWidth: number,
+  imageHeight: number,
+  box: FaceBox,
+  baseline: EmotionPrediction,
+  gridSize = 4,
+): Promise<EmotionHeatmap> {
+  const safeGridSize = Math.max(3, Math.min(5, Math.round(gridSize)));
+  const workingCanvas = document.createElement("canvas");
+  workingCanvas.width = imageWidth;
+  workingCanvas.height = imageHeight;
+  const context = workingCanvas.getContext("2d", { alpha: false });
+
+  if (!context) {
+    throw new Error("Heatmap canvas is unavailable.");
+  }
+
+  const cellWidth = box.width / safeGridSize;
+  const cellHeight = box.height / safeGridSize;
+  const originalConfidence =
+    baseline.probabilities[baseline.emotion] ?? baseline.confidence;
+  const rawCells: HeatmapCell[] = [];
+
+  for (let row = 0; row < safeGridSize; row++) {
+    for (let column = 0; column < safeGridSize; column++) {
+      context.drawImage(image, 0, 0, imageWidth, imageHeight);
+      const x = box.x + column * cellWidth;
+      const y = box.y + row * cellHeight;
+
+      // A neutral-gray occlusion measures how much this region supports
+      // the original prediction. It works with the existing ONNX output.
+      context.fillStyle = "rgb(127,127,127)";
+      context.fillRect(x, y, cellWidth, cellHeight);
+
+      const occluded = await predictEmotionFromSource(
+        workingCanvas,
+        imageWidth,
+        imageHeight,
+        box,
+      );
+      const occludedConfidence =
+        occluded.probabilities[baseline.emotion] ?? 0;
+
+      rawCells.push({
+        x,
+        y,
+        width: cellWidth,
+        height: cellHeight,
+        intensity: Math.max(0, originalConfidence - occludedConfidence),
+      });
+    }
+  }
+
+  const maximum = Math.max(...rawCells.map((cell) => cell.intensity), 1e-6);
+  return {
+    emotion: baseline.emotion,
+    cells: rawCells.map((cell) => ({
+      ...cell,
+      intensity: Math.min(1, cell.intensity / maximum),
+    })),
   };
 }

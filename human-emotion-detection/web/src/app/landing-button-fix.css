@@ -1,0 +1,27 @@
+.home-actions .home-primary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.7rem;
+  min-height: 54px;
+  padding: 0 1.4rem;
+  border: 0;
+  border-radius: 999px;
+  color: #031015;
+  background: linear-gradient(120deg, #89f4ff, #40cbe8);
+  box-shadow: 0 12px 45px rgba(54, 214, 238, 0.2);
+  font-size: 0.88rem;
+  font-weight: 750;
+  cursor: pointer;
+}
+
+.home-actions .home-primary svg {
+  width: 18px;
+  height: 18px;
+}
+
+@media (max-width: 560px) {
+  .home-actions .home-primary {
+    width: min(100%, 310px);
+  }
+}
