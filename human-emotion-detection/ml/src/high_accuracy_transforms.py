@@ -6,29 +6,31 @@ STD = [0.229, 0.224, 0.225]
 
 
 def get_high_accuracy_train_transforms(image_size=260):
+    """Mild augmentation that preserves subtle facial-expression details."""
     return transforms.Compose(
         [
             transforms.RandomResizedCrop(
                 image_size,
-                scale=(0.85, 1.0),
-                ratio=(0.95, 1.05),
+                scale=(0.88, 1.0),
+                ratio=(0.94, 1.06),
             ),
             transforms.RandomHorizontalFlip(p=0.5),
-            transforms.RandomRotation(10),
+            transforms.RandomRotation(degrees=7),
             transforms.RandomAffine(
                 degrees=0,
-                translate=(0.05, 0.05),
-                scale=(0.95, 1.05),
+                translate=(0.035, 0.035),
+                scale=(0.96, 1.04),
             ),
             transforms.ColorJitter(
-                brightness=0.15,
-                contrast=0.15,
+                brightness=0.12,
+                contrast=0.12,
             ),
             transforms.ToTensor(),
             transforms.Normalize(MEAN, STD),
             transforms.RandomErasing(
-                p=0.15,
-                scale=(0.02, 0.08),
+                p=0.08,
+                scale=(0.01, 0.05),
+                ratio=(0.5, 2.0),
             ),
         ]
     )
