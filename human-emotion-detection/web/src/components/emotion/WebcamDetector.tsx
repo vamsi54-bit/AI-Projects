@@ -1,7 +1,7 @@
 "use client";
 
-import type { FaceDetector } from "@mediapipe/tasks-vision";
-import { Activity, Camera, LoaderCircle, ScanFace, ShieldCheck, Square } from "lucide-react";
+import type { Detection, FaceDetector } from "@mediapipe/tasks-vision";
+import { Activity, AlertTriangle, Camera, LoaderCircle, ScanFace, ShieldCheck, Square } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useRef, useState, type CSSProperties } from "react";
 
@@ -25,6 +25,17 @@ interface TimelinePoint {
   confidence: number;
   id: number;
 }
+
+interface QualityWarning {
+  kind: "lighting" | "distance" | "pose" | "confidence";
+  title: string;
+  message: string;
+}
+
+const MIN_BRIGHTNESS = 52;
+const MIN_FACE_WIDTH_RATIO = 0.2;
+const MIN_CONFIDENCE = 0.48;
+const MIN_CONFIDENCE_MARGIN = 0.07;
 
 const emotionColors: Record<string, string> = {
   angry: "#ff647c",
@@ -60,6 +71,7 @@ export function WebcamDetector() {
   const lastRunRef = useRef(0);
   const timelineIdRef = useRef(0);
   const smootherRef = useRef(new PredictionSmoother(6));
+  const qualityCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const sessionStatsRef = useRef({
     samples: 0,
     confidenceTotal: 0,
@@ -74,6 +86,7 @@ export function WebcamDetector() {
   const [timeline, setTimeline] = useState<TimelinePoint[]>([]);
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const [summary, setSummary] = useState<SessionSummaryData | null>(null);
+  const [qualityWarning, setQualityWarning] = useState<QualityWarning | null>(null);
   const [, setVideoReady] = useState(false);
 
   async function createDetector() {
@@ -90,6 +103,72 @@ export function WebcamDetector() {
     });
   }
 
+  function measureBrightness(video: HTMLVideoElement) {
+    if (!qualityCanvasRef.current) {
+      qualityCanvasRef.current = document.createElement("canvas");
+      qualityCanvasRef.current.width = 48;
+      qualityCanvasRef.current.height = 36;
+    }
+
+    const canvas = qualityCanvasRef.current;
+    const context = canvas.getContext("2d", {
+      alpha: false,
+      willReadFrequently: true,
+    });
+    if (!context) return 255;
+
+    context.drawImage(video, 0, 0, canvas.width, canvas.height);
+    const pixels = context.getImageData(0, 0, canvas.width, canvas.height).data;
+    let total = 0;
+    for (let index = 0; index < pixels.length; index += 4) {
+      total += 0.299 * pixels[index] + 0.587 * pixels[index + 1] + 0.114 * pixels[index + 2];
+    }
+    return total / (pixels.length / 4);
+  }
+
+  function getFrameWarning(
+    video: HTMLVideoElement,
+    detection: Detection,
+  ): QualityWarning | null {
+    const box = detection.boundingBox;
+    if (!box) return null;
+
+    if (measureBrightness(video) < MIN_BRIGHTNESS) {
+      return {
+        kind: "lighting",
+        title: "Lighting is too low",
+        message: "Move toward a light source so your face is clearly visible.",
+      };
+    }
+
+    if (box.width / video.videoWidth < MIN_FACE_WIDTH_RATIO) {
+      return {
+        kind: "distance",
+        title: "Move closer",
+        message: "Bring your face closer to the camera for a reliable reading.",
+      };
+    }
+
+    const points = detection.keypoints;
+    if (points && points.length >= 3) {
+      const rightEyeX = points[0].x * video.videoWidth;
+      const leftEyeX = points[1].x * video.videoWidth;
+      const noseX = points[2].x * video.videoWidth;
+      const eyeDistanceRatio = Math.abs(leftEyeX - rightEyeX) / box.width;
+      const noseOffsetRatio = Math.abs(noseX - (box.originX + box.width / 2)) / box.width;
+
+      if (eyeDistanceRatio < 0.22 || noseOffsetRatio > 0.2) {
+        return {
+          kind: "pose",
+          title: "Face the camera",
+          message: "Keep both eyes visible and look straight toward the camera.",
+        };
+      }
+    }
+
+    return null;
+  }
+
   async function analyseFrame(timestamp: number) {
     const video = videoRef.current;
     const detector = detectorRef.current;
@@ -98,10 +177,15 @@ export function WebcamDetector() {
 
     const startedAt = performance.now();
     const detectionResult = detector.detectForVideo(video, timestamp);
-    const boxes: FaceBox[] = detectionResult.detections
+    const detections = detectionResult.detections
+      .filter((detection) => Boolean(detection.boundingBox))
+      .sort((first, second) =>
+        (second.boundingBox?.width ?? 0) * (second.boundingBox?.height ?? 0) -
+        (first.boundingBox?.width ?? 0) * (first.boundingBox?.height ?? 0))
+      .slice(0, performanceProfileRef.current.maxFaces);
+
+    const boxes: FaceBox[] = detections
       .map((detection) => detection.boundingBox)
-      .filter((box) => Boolean(box))
-      .slice(0, performanceProfileRef.current.maxFaces)
       .map((box) => ({
         x: box!.originX,
         y: box!.originY,
@@ -110,6 +194,15 @@ export function WebcamDetector() {
       }));
 
     if (boxes.length === 0) {
+      setQualityWarning(null);
+      setResults([]);
+      setLatency(Math.round(performance.now() - startedAt));
+      return;
+    }
+
+    const frameWarning = getFrameWarning(video, detections[0]);
+    if (frameWarning) {
+      setQualityWarning(frameWarning);
       setResults([]);
       setLatency(Math.round(performance.now() - startedAt));
       return;
@@ -123,6 +216,24 @@ export function WebcamDetector() {
       ...result,
       prediction: index === 0 ? smootherRef.current.update(result.prediction) : result.prediction,
     }));
+
+    const primaryScores = Object.values(predictions[0].prediction.probabilities)
+      .sort((first, second) => second - first);
+    const confidence = primaryScores[0] ?? 0;
+    const confidenceMargin = confidence - (primaryScores[1] ?? 0);
+
+    if (confidence < MIN_CONFIDENCE || confidenceMargin < MIN_CONFIDENCE_MARGIN) {
+      setQualityWarning({
+        kind: "confidence",
+        title: "Prediction uncertain",
+        message: "Hold still, face the camera, and improve the lighting.",
+      });
+      setResults([]);
+      setLatency(Math.round(performance.now() - startedAt));
+      return;
+    }
+
+    setQualityWarning(null);
 
     const primary = predictions[0]?.prediction;
     if (primary) {
@@ -167,6 +278,7 @@ export function WebcamDetector() {
       setResults([]);
       setTimeline([]);
       setSummary(null);
+      setQualityWarning(null);
       setElapsedSeconds(0);
       smootherRef.current.reset();
       sessionStatsRef.current = { samples: 0, confidenceTotal: 0, emotions: {} };
@@ -247,6 +359,7 @@ export function WebcamDetector() {
     setVideoReady(false);
     setResults([]);
     setTimeline([]);
+    setQualityWarning(null);
     setStatus("idle");
   }
 
@@ -357,9 +470,25 @@ export function WebcamDetector() {
       {status === "live" && <div className="scan-beam" />}
 
       {status === "live" && results.length === 0 && (
-        <div className="glass-panel absolute left-1/2 top-1/2 z-10 -translate-x-1/2 -translate-y-1/2 rounded-full px-5 py-3 text-sm text-slate-300">
-          <span className="mr-2 inline-block h-2 w-2 animate-pulse rounded-full bg-cyan-300" />
-          Looking for a face
+        <div
+          className="glass-panel absolute left-1/2 top-1/2 z-10 w-[min(390px,calc(100vw-32px))] -translate-x-1/2 -translate-y-1/2 rounded-2xl px-5 py-4 text-slate-200"
+          role="status"
+          aria-live="polite"
+        >
+          {qualityWarning ? (
+            <div className="flex items-start gap-3">
+              <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-amber-300" />
+              <div>
+                <p className="font-semibold">{qualityWarning.title}</p>
+                <p className="mt-1 text-xs leading-5 text-slate-400">{qualityWarning.message}</p>
+              </div>
+            </div>
+          ) : (
+            <div className="text-center text-sm">
+              <span className="mr-2 inline-block h-2 w-2 animate-pulse rounded-full bg-cyan-300" />
+              Looking for a face
+            </div>
+          )}
         </div>
       )}
 
