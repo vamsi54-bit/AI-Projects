@@ -26,6 +26,18 @@ PROJECT_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_DATASET = PROJECT_ROOT / "ml/data/ferplus/fer2013plus/fer2013"
 DEFAULT_OUTPUT = PROJECT_ROOT / "ml/data/processed/quality_audit"
 CLASSES = ["angry", "disgust", "fear", "happy", "neutral", "sad", "surprise"]
+LABEL_ALIASES = {
+    "anger": "angry",
+    "angry": "angry",
+    "disgust": "disgust",
+    "fear": "fear",
+    "happiness": "happy",
+    "happy": "happy",
+    "neutral": "neutral",
+    "sadness": "sad",
+    "sad": "sad",
+    "surprise": "surprise",
+}
 IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".bmp", ".webp"}
 
 
@@ -51,8 +63,8 @@ def discover(dataset: Path) -> list[dict[str, object]]:
             print(f"Warning: missing split: {split_dir}")
             continue
         for class_dir in sorted(path for path in split_dir.iterdir() if path.is_dir()):
-            label = class_dir.name.lower()
-            if label not in CLASSES:
+            label = LABEL_ALIASES.get(class_dir.name.lower())
+            if label is None:
                 continue
             for path in class_dir.rglob("*"):
                 if path.is_file() and path.suffix.lower() in IMAGE_EXTENSIONS:
