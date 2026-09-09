@@ -25,3 +25,38 @@
       url("/images/emotion-landing-hero.png") 65% center / cover no-repeat;
   }
 }
+
+.landing-hero {
+  display: flex;
+  align-items: center;
+  min-height: calc(100vh - 132px);
+  padding: 60px clamp(40px, 7vw, 130px);
+}
+
+.landing-hero-content {
+  width: min(620px, 46vw);
+  margin-left: clamp(20px, 3vw, 60px);
+}
+
+.landing-hero-content h1 {
+  font-size: clamp(64px, 6vw, 108px);
+  line-height: 0.98;
+  max-width: 620px;
+}
+
+@media (max-width: 768px) {
+  .landing-hero {
+    justify-content: center;
+    padding: 40px 24px;
+  }
+
+  .landing-hero-content {
+    width: 100%;
+    margin: 0;
+    text-align: center;
+  }
+
+  .landing-hero-content h1 {
+    font-size: clamp(48px, 14vw, 72px);
+  }
+}
