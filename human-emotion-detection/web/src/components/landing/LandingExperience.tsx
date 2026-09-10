@@ -1,7 +1,7 @@
 "use client";
-
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import EmotionCore from "./EmotionCore";
 import { useEffect, useState } from "react";
 import {
   ArrowLeft,
@@ -18,6 +18,7 @@ import {
 } from "lucide-react";
 
 type Stage = "intro" | "guide" | "policy";
+
 const POLICY_KEY = "emora.policy.v2.accepted";
 
 const guide = [
@@ -139,46 +140,8 @@ export default function LandingExperience() {
           </div>
         </div>
 
-        <div className="home-visual" aria-hidden="true">
-          <div className="orbit orbit-one" />
-          <div className="orbit orbit-two" />
-          <div className="orbit orbit-three" />
-          <div className="visual-glow" />
-          <div className="face-core">
-            <div className="scanner" />
-            <span className="corner corner-a" />
-            <span className="corner corner-b" />
-            <span className="corner corner-c" />
-            <span className="corner corner-d" />
-            <ScanFace />
-            <i className="core-pulse" />
-          </div>
-          <div className="floating-signal signal-happy">
-            <span>HAPPY</span>
-            <strong>94%</strong>
-            <i />
-          </div>
-          <div className="floating-signal signal-neutral">
-            <span>NEUTRAL</span>
-            <strong>87%</strong>
-            <i />
-          </div>
-          <div className="floating-signal signal-surprise">
-            <span>SURPRISE</span>
-            <strong>81%</strong>
-            <i />
-          </div>
-          <div className="floating-signal signal-private">
-            <span>PROCESSING</span>
-            <strong>PRIVATE</strong>
-            <i />
-          </div>
-          <div className="data-stream stream-one" />
-          <div className="data-stream stream-two" />
-          <div className="particle particle-one" />
-          <div className="particle particle-two" />
-          <div className="particle particle-three" />
-          <div className="particle particle-four" />
+        <div className="landing-3d">
+          <EmotionCore />
         </div>
       </section>
 
