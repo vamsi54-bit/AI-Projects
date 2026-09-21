@@ -250,3 +250,24 @@
     font-size: clamp(58px, 7vw, 82px);
   }
 }
+
+.landing-model-area,
+.knight-experience,
+.knight-experience canvas {
+  pointer-events: none;
+}
+
+.landing-hero-content,
+.landing-dashboard-button {
+  position: relative;
+  z-index: 20;
+  pointer-events: auto;
+  touch-action: manipulation;
+}
+
+@media (max-width: 768px) {
+  .landing-model-area,
+  .knight-experience {
+    display: none !important;
+  }
+}
