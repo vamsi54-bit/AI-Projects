@@ -1,0 +1,14 @@
+{
+  "provider": "Isolated HTTP provider double; no real Groq calls",
+  "streaming": "incremental text, working/idle, specialists inactive passed",
+  "providerError": "visible and recoverable",
+  "recording": "browser MediaRecorder -> HTTP -> transcript review/edit -> WebSocket chat passed with synthetic microphone and provider double",
+  "cancel": "recording discarded without sending; all capture tracks released",
+  "preview": "isolated from live messages and input",
+  "responsive": "1440, 768, 390, 320px: no horizontal overflow and dock fits",
+  "reconnect": "new session resets conversation",
+  "permission": "denied permission shows error and preserves text fallback",
+  "silence": "zero-level fixture rejected before upload",
+  "recordLimit": "60-second timer registration and automatic stop/release passed with test-only accelerated timer",
+  "pageErrors": []
+}

@@ -1,0 +1,11 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": false,
+    "rootDir": "src/lib",
+    "outDir": ".test-build"
+  },
+  "include": [
+    "src/lib/events.ts"
+  ]
+}

@@ -1,0 +1,18 @@
+{
+  "name": "voiceteam",
+  "version": "0.1.0",
+  "private": true,
+  "engines": {
+    "node": ">=22.12.0"
+  },
+  "workspaces": [
+    "apps/web"
+  ],
+  "scripts": {
+    "dev": "npm run dev --workspace @voiceteam/web",
+    "build": "npm run build --workspace @voiceteam/web",
+    "typecheck": "npm run typecheck --workspace @voiceteam/web",
+    "preview": "npm run preview --workspace @voiceteam/web",
+    "test:contracts": "npm run test:contracts --workspace @voiceteam/web"
+  }
+}

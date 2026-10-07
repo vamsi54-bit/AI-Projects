@@ -1,0 +1,14 @@
+node_modules/
+dist/
+.venv/
+__pycache__/
+*.py[cod]
+.env
+.env.*
+!.env.example
+.vite/
+*.log
+.DS_Store
+Thumbs.db
+
+.test-build/
