@@ -1,9 +1,13 @@
+@"
 .venv/
 __pycache__/
 *.pyc
 .env
-datasets/
-*.onnx
-*.pt
-*.pth
-.ipynb_checkpoints/
+github-recovery-codes.txt
+"@ | Set-Content .gitignore
+data/index/
+data/guidelines/*.pdf
+test_llm.py
+list_models.py
+probe_models.py
+check_pdf.py

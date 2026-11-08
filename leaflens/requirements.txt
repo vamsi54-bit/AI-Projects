@@ -1,0 +1,8 @@
+fastapi
+onnxruntime
+pillow
+numpy
+python-multipart
+timm
+grad-cam
+torchvision
